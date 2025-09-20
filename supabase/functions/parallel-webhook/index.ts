@@ -42,29 +42,65 @@ serve(async (req) => {
     const parallelApiKey = Deno.env.get('PARALLEL_API_KEY')!;
     const webhookSecret = Deno.env.get('PARALLEL_WEBHOOK_SECRET');
 
+    console.log('🔧 Environment check:', {
+      supabaseUrl: supabaseUrl ? '✅ Set' : '❌ Missing',
+      supabaseKey: supabaseKey ? '✅ Set' : '❌ Missing',
+      parallelApiKey: parallelApiKey ? '✅ Set' : '❌ Missing',
+      webhookSecret: webhookSecret ? '✅ Set' : '⚠️ Not set (optional)'
+    });
+
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const payload = await req.text();
-    const webhookData = JSON.parse(payload);
-
-    console.log('Received webhook:', JSON.stringify(webhookData, null, 2));
+    console.log('📨 Received webhook payload:', payload);
+    
+    let webhookData;
+    try {
+      webhookData = JSON.parse(payload);
+      console.log('✅ Parsed webhook data:', JSON.stringify(webhookData, null, 2));
+    } catch (parseError) {
+      console.error('❌ Error parsing webhook payload as JSON:', parseError);
+      throw new Error(`Invalid JSON payload: ${parseError.message}`);
+    }
 
     // Verify webhook signature if secret is configured
     if (webhookSecret) {
+      console.log('🔐 Verifying webhook signature...');
       const signature = req.headers.get('webhook-signature') || '';
       const timestamp = req.headers.get('webhook-timestamp') || '';
       const webhookId = req.headers.get('webhook-id') || '';
 
+      console.log('🔍 Signature verification data:', {
+        signature: signature ? '✅ Present' : '❌ Missing',
+        timestamp: timestamp ? '✅ Present' : '❌ Missing',
+        webhookId: webhookId ? '✅ Present' : '❌ Missing'
+      });
+
       const isValid = await verifyWebhookSignature(payload, signature, timestamp, webhookId, webhookSecret);
       if (!isValid) {
-        console.error('Invalid webhook signature');
+        console.error('❌ Invalid webhook signature verification failed');
         return new Response('Invalid signature', { status: 401 });
       }
+      console.log('✅ Webhook signature verified successfully');
+    } else {
+      console.log('⚠️ Webhook signature verification skipped (no secret configured)');
     }
 
     const { status, run_id } = webhookData;
+    
+    console.log('📊 Processing webhook:', {
+      status,
+      run_id,
+      timestamp: new Date().toISOString()
+    });
+
+    if (!run_id) {
+      console.error('❌ No run_id in webhook data:', webhookData);
+      throw new Error('Missing run_id in webhook payload');
+    }
 
     // Update task status in database
+    console.log('💾 Updating task status in database...');
     const { error: updateError } = await supabase
       .from('task_runs')
       .update({ 
@@ -74,11 +110,11 @@ serve(async (req) => {
       .eq('parallel_run_id', run_id);
 
     if (updateError) {
-      console.error('Error updating task status:', updateError);
+      console.error('❌ Database update error:', updateError);
       throw updateError;
     }
 
-    console.log(`Updated task ${run_id} to status: ${status}`);
+    console.log(`✅ Updated task ${run_id} to status: ${status}`);
 
     // If completed, fetch results and add to messages
     if (status === 'completed') {
@@ -197,9 +233,19 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Error in parallel-webhook function:', error);
+    console.error('💥 CRITICAL ERROR in parallel-webhook function:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      headers: Object.fromEntries(req.headers.entries()),
+      url: req.url,
+      method: req.method
+    });
+    
     return new Response(JSON.stringify({ 
-      error: error.message 
+      error: error.message,
+      type: error.name,
+      timestamp: new Date().toISOString()
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

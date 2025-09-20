@@ -59,36 +59,57 @@ serve(async (req) => {
       parts: [{ text: message }]
     });
 
-    console.log('Sending request to Gemini API with', geminiMessages.length, 'messages');
+    console.log('🚀 Sending request to Gemini API with', geminiMessages.length, 'messages');
 
-    // Call Gemini API
-    const geminiResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', {
-      method: 'POST',
-      headers: {
-        'x-goog-api-key': geminiApiKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: geminiMessages,
-        generationConfig: {
-          temperature: 0.9,
-          topK: 1,
-          topP: 1,
-          maxOutputTokens: 2048,
+    let geminiResponse;
+    try {
+      // Call Gemini API
+      geminiResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', {
+        method: 'POST',
+        headers: {
+          'x-goog-api-key': geminiApiKey,
+          'Content-Type': 'application/json',
         },
-      }),
-    });
+        body: JSON.stringify({
+          contents: geminiMessages,
+          generationConfig: {
+            temperature: 0.9,
+            topK: 1,
+            topP: 1,
+            maxOutputTokens: 2048,
+          },
+        }),
+      });
 
-    console.log('Gemini API response status:', geminiResponse.status);
+      console.log('📡 Gemini API response received:', {
+        status: geminiResponse.status,
+        statusText: geminiResponse.statusText,
+        ok: geminiResponse.ok
+      });
+      
+    } catch (fetchError) {
+      console.error('❌ Network error calling Gemini API:', fetchError);
+      throw new Error(`Network error calling Gemini API: ${fetchError.message}`);
+    }
 
     if (!geminiResponse.ok) {
       const errorText = await geminiResponse.text();
-      console.error('Gemini API error:', errorText);
+      console.error('❌ Gemini API error response:', {
+        status: geminiResponse.status,
+        statusText: geminiResponse.statusText,
+        body: errorText
+      });
       throw new Error(`Gemini API error: ${geminiResponse.status} - ${errorText}`);
     }
 
-    const geminiData = await geminiResponse.json();
-    console.log('Gemini API response:', JSON.stringify(geminiData, null, 2));
+    let geminiData;
+    try {
+      geminiData = await geminiResponse.json();
+      console.log('✅ Gemini API response parsed successfully');
+    } catch (jsonError) {
+      console.error('❌ Error parsing Gemini API response as JSON:', jsonError);
+      throw new Error(`Error parsing Gemini API response: ${jsonError.message}`);
+    }
 
     const content = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
     const tokens = geminiData.usageMetadata?.totalTokenCount || 0;
@@ -106,9 +127,17 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Error in chat-send function:', error);
+    console.error('💥 CRITICAL ERROR in chat-send function:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      sessionId: req.url ? new URL(req.url).searchParams.get('sessionId') : 'unknown'
+    });
+    
     return new Response(JSON.stringify({ 
-      error: error.message 
+      error: error.message,
+      type: error.name,
+      timestamp: new Date().toISOString()
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
