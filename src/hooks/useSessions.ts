@@ -160,7 +160,7 @@ export function useSessions() {
     try {
       const { error } = await supabase
         .from('chat_sessions')
-        .update({ last_activity: new Date().toISOString() })
+        .update({ updated_at: new Date().toISOString() })
         .eq('id', sessionId);
 
       if (error) throw error;

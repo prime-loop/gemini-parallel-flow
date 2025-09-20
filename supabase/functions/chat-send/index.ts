@@ -8,13 +8,12 @@ const corsHeaders = {
 
 interface GeminiMessage {
   role: 'user' | 'model';
-  parts: { text: string }[];
+  parts: Array<{ text: string }>;
 }
 
 interface ChatRequest {
   sessionId: string;
   message: string;
-  stream?: boolean;
 }
 
 serve(async (req) => {
@@ -32,7 +31,7 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
-    const { sessionId, message, stream = false }: ChatRequest = await req.json();
+    const { sessionId, message }: ChatRequest = await req.json();
 
     // Fetch conversation history
     const { data: messages, error: messagesError } = await supabase
@@ -41,26 +40,29 @@ serve(async (req) => {
       .eq('session_id', sessionId)
       .order('created_at', { ascending: true });
 
-    if (messagesError) throw messagesError;
+    if (messagesError) {
+      console.error('Error fetching messages:', messagesError);
+      throw messagesError;
+    }
 
-    // Convert to Gemini format
-    const geminiMessages: GeminiMessage[] = messages
+    // Format messages for Gemini
+    const geminiMessages: GeminiMessage[] = (messages || [])
       .filter(msg => msg.role === 'user' || msg.role === 'assistant')
       .map(msg => ({
         role: msg.role === 'user' ? 'user' : 'model',
         parts: [{ text: msg.content }]
       }));
 
-    // Add current message
+    // Add the new user message
     geminiMessages.push({
       role: 'user',
       parts: [{ text: message }]
     });
 
+    console.log('Sending request to Gemini API with', geminiMessages.length, 'messages');
+
     // Call Gemini API
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
-    
-    const geminiResponse = await fetch(geminiUrl, {
+    const geminiResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', {
       method: 'POST',
       headers: {
         'x-goog-api-key': geminiApiKey,
@@ -69,24 +71,34 @@ serve(async (req) => {
       body: JSON.stringify({
         contents: geminiMessages,
         generationConfig: {
-          temperature: 0.7,
+          temperature: 0.9,
+          topK: 1,
+          topP: 1,
           maxOutputTokens: 2048,
         },
       }),
     });
 
+    console.log('Gemini API response status:', geminiResponse.status);
+
     if (!geminiResponse.ok) {
-      const error = await geminiResponse.text();
-      console.error('Gemini API error:', error);
-      throw new Error(`Gemini API error: ${geminiResponse.status}`);
+      const errorText = await geminiResponse.text();
+      console.error('Gemini API error:', errorText);
+      throw new Error(`Gemini API error: ${geminiResponse.status} - ${errorText}`);
     }
 
     const geminiData = await geminiResponse.json();
-    const content = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated';
+    console.log('Gemini API response:', JSON.stringify(geminiData, null, 2));
+
+    const content = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
     const tokens = geminiData.usageMetadata?.totalTokenCount || 0;
 
+    if (!content) {
+      throw new Error('No response generated');
+    }
+
     return new Response(JSON.stringify({ 
-      content, 
+      content,
       tokens,
       model: 'gemini-2.5-flash'
     }), {

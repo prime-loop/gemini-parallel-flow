@@ -150,7 +150,7 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
     addLog('info', 'Research brief created', 'frontend', { brief });
 
     addLog('info', 'Sending request to research-start API', 'api', { 
-      url: 'https://ebxnfsnpfdhfyyrajvli.supabase.co/functions/v1/research-start',
+      url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/research-start`,
       sessionId 
     });
 

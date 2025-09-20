@@ -8,7 +8,7 @@ const corsHeaders = {
 
 interface GeminiMessage {
   role: 'user' | 'model';
-  parts: { text: string }[];
+  parts: Array<{ text: string }>;
 }
 
 interface ResearchBrief {
@@ -49,84 +49,93 @@ serve(async (req) => {
       .eq('session_id', sessionId)
       .order('created_at', { ascending: true });
 
-    if (messagesError) throw messagesError;
+    if (messagesError) {
+      console.error('Error fetching messages:', messagesError);
+      throw messagesError;
+    }
 
-    // Convert to Gemini format
-    const geminiMessages: GeminiMessage[] = messages
+    // Format messages for Gemini
+    const geminiMessages: GeminiMessage[] = (messages || [])
       .filter(msg => msg.role === 'user' || msg.role === 'assistant')
       .map(msg => ({
         role: msg.role === 'user' ? 'user' : 'model',
         parts: [{ text: msg.content }]
       }));
 
-    // Add planning prompt
-    const planningPrompt: GeminiMessage = {
+    // Add system prompt for research brief generation
+    geminiMessages.push({
       role: 'user',
       parts: [{
-        text: `You are a research planner. Based on the conversation above, create a structured research brief. You must return a JSON object with exactly these fields:
-        - objective: string (clear research goal)
-        - constraints: string[] (any limitations or requirements)
-        - target_sources: string[] (preferred types of sources like "academic papers", "news articles", "official websites")
-        - disallowed_sources: string[] (sources to avoid like "social media", "opinion blogs")
-        - timebox_minutes: number (estimated time needed, 5-30 minutes)
-        - expected_output_fields: string[] (what fields should be in the result like "summary", "key_facts", "sources")
-        - summary: string (one-sentence description)
+        text: `Based on our conversation history, create a comprehensive research brief. Return your response as a JSON object with the following structure:
 
-        Return ONLY valid JSON, no other text.`
+{
+  "objective": "Clear research objective based on the conversation",
+  "constraints": ["Any limitations or constraints mentioned"],
+  "target_sources": ["academic", "news", "web", "technical_docs"],
+  "disallowed_sources": ["social_media", "forums"],
+  "timebox_minutes": 5,
+  "expected_output_fields": ["summary", "key_facts", "sources", "recommendations"],
+  "summary": "Brief summary of what research is needed"
+}
+
+Focus on the user's most recent questions and interests. Make the objective specific and actionable.`
       }]
-    };
+    });
 
-    const allMessages = [...geminiMessages, planningPrompt];
+    console.log('Generating research brief with Gemini');
 
     // Call Gemini API
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
-    
-    const geminiResponse = await fetch(geminiUrl, {
+    const geminiResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', {
       method: 'POST',
       headers: {
         'x-goog-api-key': geminiApiKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        contents: allMessages,
+        contents: geminiMessages,
         generationConfig: {
           temperature: 0.3,
+          topK: 1,
+          topP: 1,
           maxOutputTokens: 1024,
         },
       }),
     });
 
+    console.log('Gemini API response status:', geminiResponse.status);
+
     if (!geminiResponse.ok) {
-      const error = await geminiResponse.text();
-      console.error('Gemini API error:', error);
-      throw new Error(`Gemini API error: ${geminiResponse.status}`);
+      const errorText = await geminiResponse.text();
+      console.error('Gemini API error:', errorText);
+      throw new Error(`Gemini API error: ${geminiResponse.status} - ${errorText}`);
     }
 
     const geminiData = await geminiResponse.json();
     const content = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
-    
+
     if (!content) {
-      throw new Error('No response from Gemini');
+      throw new Error('No response generated');
     }
 
     // Parse JSON response
-    let researchBrief: ResearchBrief;
+    let brief: ResearchBrief;
     try {
-      researchBrief = JSON.parse(content);
-    } catch (error) {
-      console.error('Invalid JSON from Gemini:', content);
-      throw new Error(`Invalid JSON response: ${content}`);
+      brief = JSON.parse(content);
+    } catch (parseError) {
+      console.error('Error parsing JSON response:', parseError);
+      console.error('Raw content:', content);
+      throw new Error('Failed to parse research brief JSON');
     }
 
     // Validate required fields
     const requiredFields = ['objective', 'constraints', 'target_sources', 'disallowed_sources', 'timebox_minutes', 'expected_output_fields', 'summary'];
     for (const field of requiredFields) {
-      if (!(field in researchBrief)) {
+      if (!(field in brief)) {
         throw new Error(`Missing required field: ${field}`);
       }
     }
 
-    return new Response(JSON.stringify(researchBrief), {
+    return new Response(JSON.stringify(brief), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

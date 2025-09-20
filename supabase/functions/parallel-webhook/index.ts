@@ -1,10 +1,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
-import { createHmac } from "https://deno.land/std@0.190.0/crypto/crypto.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, webhook-id, webhook-timestamp, webhook-signature',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 async function verifyWebhookSignature(
@@ -14,8 +13,6 @@ async function verifyWebhookSignature(
   webhookId: string,
   secret: string
 ): Promise<boolean> {
-  const signedPayload = `${webhookId}.${timestamp}.${payload}`;
-  
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     'raw',
@@ -24,13 +21,14 @@ async function verifyWebhookSignature(
     false,
     ['sign']
   );
-  
-  const signatureBuffer = await crypto.subtle.sign('HMAC', key, encoder.encode(signedPayload));
-  const expectedSignature = btoa(String.fromCharCode(...new Uint8Array(signatureBuffer)));
-  
-  // Check against all provided signatures (space-separated)
+
+  const signedPayload = `${webhookId}.${timestamp}.${payload}`;
+  const expectedBytes = await crypto.subtle.sign('HMAC', key, encoder.encode(signedPayload));
+  const expectedSignature = btoa(String.fromCharCode(...new Uint8Array(expectedBytes)));
+
+  // Signature header may contain multiple space-separated values
   const signatures = signature.split(' ');
-  return signatures.some(sig => sig === `v1=${expectedSignature}`);
+  return signatures.some(sig => sig === expectedSignature);
 }
 
 serve(async (req) => {
@@ -46,134 +44,155 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get webhook headers
-    const webhookId = req.headers.get('webhook-id');
-    const webhookTimestamp = req.headers.get('webhook-timestamp');
-    const webhookSignature = req.headers.get('webhook-signature');
-
     const payload = await req.text();
+    const webhookData = JSON.parse(payload);
 
-    // Verify signature if secret is configured
-    if (webhookSecret && webhookId && webhookTimestamp && webhookSignature) {
-      const isValid = await verifyWebhookSignature(
-        payload,
-        webhookSignature,
-        webhookTimestamp,
-        webhookId,
-        webhookSecret
-      );
+    console.log('Received webhook:', JSON.stringify(webhookData, null, 2));
 
+    // Verify webhook signature if secret is configured
+    if (webhookSecret) {
+      const signature = req.headers.get('webhook-signature') || '';
+      const timestamp = req.headers.get('webhook-timestamp') || '';
+      const webhookId = req.headers.get('webhook-id') || '';
+
+      const isValid = await verifyWebhookSignature(payload, signature, timestamp, webhookId, webhookSecret);
       if (!isValid) {
         console.error('Invalid webhook signature');
-        return new Response('Invalid signature', { status: 400 });
+        return new Response('Invalid signature', { status: 401 });
       }
     }
 
-    const webhookData = JSON.parse(payload);
-    console.log('Received webhook:', webhookData);
+    const { status, run_id } = webhookData;
 
-    const { run_id, status } = webhookData;
-
-    if (!run_id) {
-      console.error('No run_id in webhook data');
-      return new Response('Missing run_id', { status: 400 });
-    }
-
-    // Update task run status
-    const { data: taskRun, error: taskError } = await supabase
+    // Update task status in database
+    const { error: updateError } = await supabase
       .from('task_runs')
-      .update({ status })
-      .eq('parallel_run_id', run_id)
-      .select('session_id')
-      .single();
+      .update({ 
+        status: status,
+        completed_at: status === 'completed' ? new Date().toISOString() : null
+      })
+      .eq('parallel_run_id', run_id);
 
-    if (taskError) {
-      console.error('Error updating task run:', taskError);
-      throw taskError;
+    if (updateError) {
+      console.error('Error updating task status:', updateError);
+      throw updateError;
     }
 
-    if (!taskRun) {
-      console.error('Task run not found:', run_id);
-      return new Response('Task run not found', { status: 404 });
-    }
+    console.log(`Updated task ${run_id} to status: ${status}`);
 
-    // If completed, fetch the result
+    // If completed, fetch results and add to messages
     if (status === 'completed') {
-      try {
-        const resultResponse = await fetch(`https://api.parallel.ai/v1/tasks/runs/${run_id}/result`, {
-          headers: {
-            'x-api-key': parallelApiKey,
-          },
-        });
+      console.log('Task completed, fetching results from Parallel API');
 
-        if (resultResponse.ok) {
-          const result = await resultResponse.json();
-          
-          // Format result message
-          const resultMessage = `✅ **Research Completed**
+      const parallelResponse = await fetch(`https://api.parallel.ai/v1/tasks/runs/${run_id}`, {
+        headers: {
+          'x-api-key': parallelApiKey,
+          'Content-Type': 'application/json',
+        },
+      });
 
-**Summary:**
-${result.summary}
-
-**Key Facts:**
-${result.key_facts?.map((fact: string, i: number) => `${i + 1}. ${fact}`).join('\n') || 'No key facts provided'}
-
-**Sources:**
-${result.sources?.map((source: string, i: number) => `${i + 1}. ${source}`).join('\n') || 'No sources provided'}
-
-*Task ID: ${run_id}*`;
-
-          // Add result message to session
-          await supabase
-            .from('messages')
-            .insert({
-              session_id: taskRun.session_id,
-              role: 'research',
-              content: resultMessage,
-              metadata: { 
-                run_id, 
-                status: 'completed',
-                result 
-              }
-            });
-        } else {
-          console.error('Failed to fetch result:', resultResponse.status);
-          // Add error message
-          await supabase
-            .from('messages')
-            .insert({
-              session_id: taskRun.session_id,
-              role: 'system',
-              content: `❌ Research task completed but failed to retrieve results. Task ID: ${run_id}`,
-              metadata: { run_id, status: 'error' }
-            });
-        }
-      } catch (error) {
-        console.error('Error fetching result:', error);
-        // Add error message
-        await supabase
-          .from('messages')
-          .insert({
-            session_id: taskRun.session_id,
-            role: 'system',
-            content: `❌ Research task completed but encountered an error retrieving results. Task ID: ${run_id}`,
-            metadata: { run_id, status: 'error' }
-          });
+      if (!parallelResponse.ok) {
+        const errorText = await parallelResponse.text();
+        console.error('Error fetching Parallel results:', errorText);
+        throw new Error(`Failed to fetch results: ${parallelResponse.status}`);
       }
-    } else if (status === 'failed' || status === 'canceled') {
-      // Add failure message
+
+      const resultData = await parallelResponse.json();
+      console.log('Parallel results:', JSON.stringify(resultData, null, 2));
+
+      // Get session_id from task_runs table
+      const { data: taskData, error: taskError } = await supabase
+        .from('task_runs')
+        .select('session_id')
+        .eq('parallel_run_id', run_id)
+        .single();
+
+      if (taskError || !taskData) {
+        console.error('Error finding task:', taskError);
+        throw new Error('Task not found');
+      }
+
+      // Store results in task_runs table
+      await supabase
+        .from('task_runs')
+        .update({ 
+          result: JSON.stringify(resultData.output),
+          metadata: { completed_at: new Date().toISOString() }
+        })
+        .eq('parallel_run_id', run_id);
+
+      // Format results for chat display
+      const output = resultData.output;
+      let formattedContent = '✅ **Research Complete**\n\n';
+
+      if (output?.summary) {
+        formattedContent += `## Summary\n${output.summary}\n\n`;
+      }
+
+      if (output?.key_facts && Array.isArray(output.key_facts)) {
+        formattedContent += '## Key Facts\n';
+        output.key_facts.forEach((fact: string, index: number) => {
+          formattedContent += `${index + 1}. ${fact}\n`;
+        });
+        formattedContent += '\n';
+      }
+
+      if (output?.sources && Array.isArray(output.sources)) {
+        formattedContent += '## Sources\n';
+        output.sources.forEach((source: string, index: number) => {
+          formattedContent += `${index + 1}. ${source}\n`;
+        });
+        formattedContent += '\n';
+      }
+
+      formattedContent += `*Task ID: ${run_id}*`;
+
+      // Add results message to chat
       await supabase
         .from('messages')
         .insert({
-          session_id: taskRun.session_id,
+          session_id: taskData.session_id,
+          role: 'research',
+          content: formattedContent,
+          metadata: { 
+            run_id: run_id, 
+            status: 'completed',
+            results: output
+          }
+        });
+
+      console.log('Research results added to chat');
+    } else if (status === 'failed' || status === 'canceled') {
+      console.log(`Task ${status}, adding failure message`);
+
+      // Get session_id from task_runs table
+      const { data: taskData, error: taskError } = await supabase
+        .from('task_runs')
+        .select('session_id')
+        .eq('parallel_run_id', run_id)
+        .single();
+
+      if (taskError || !taskData) {
+        console.error('Error finding task:', taskError);
+        throw new Error('Task not found');
+      }
+
+      // Add failure message to chat
+      await supabase
+        .from('messages')
+        .insert({
+          session_id: taskData.session_id,
           role: 'system',
-          content: `❌ Research task ${status}. Task ID: ${run_id}`,
-          metadata: { run_id, status }
+          content: `❌ **Research ${status.charAt(0).toUpperCase() + status.slice(1)}**\n\nThe research task encountered an issue and could not be completed.\n\n*Task ID: ${run_id}*\n\nPlease try again with a different query or check the Parallel.ai service status.`,
+          metadata: { 
+            run_id: run_id, 
+            status: status,
+            error: true
+          }
         });
     }
 
     return new Response(JSON.stringify({ success: true }), {
-      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

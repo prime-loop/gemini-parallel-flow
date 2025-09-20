@@ -1,1 +1,16 @@
 project_id = "crdvvzncxicklblypvnz"
+
+[functions.chat-send]
+verify_jwt = false
+
+[functions.chat-plan]
+verify_jwt = false
+
+[functions.research-start]
+verify_jwt = false
+
+[functions.parallel-webhook]
+verify_jwt = false
+
+[functions.research-stream]
+verify_jwt = false
