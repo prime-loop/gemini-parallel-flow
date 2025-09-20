@@ -138,6 +138,20 @@ export function MessageCard({ message, onRetry }: MessageCardProps) {
           </ReactMarkdown>
         </div>
         
+        {/* Add pulsing animation for researching messages */}
+        {message.metadata?.status === 'researching' && (
+          <div className="flex items-center gap-2 mt-3 p-3 bg-muted/50 rounded-lg border">
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
+            </div>
+            <span className="text-sm text-muted-foreground animate-pulse">
+              Research in progress... This may take several minutes
+            </span>
+          </div>
+        )}
+        
         {message.metadata?.tokens && (
           <div className="text-xs text-muted-foreground mt-2 flex items-center gap-4">
             <span>Tokens: {message.metadata.tokens}</span>

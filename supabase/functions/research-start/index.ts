@@ -36,8 +36,14 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
     const { sessionId, brief }: ResearchRequest = await req.json();
 
-    // Create Parallel Task Run
+    // Create Parallel Task Run with correct payload structure
     const parallelRequest = {
+      input: JSON.stringify(brief),
+      processor: 'core',
+      metadata: { 
+        session_id: sessionId,
+        format: 'json'
+      },
       task_spec: {
         output_schema: {
           type: 'object',
@@ -55,10 +61,6 @@ serve(async (req) => {
           required: ['summary', 'sources']
         }
       },
-      input: JSON.stringify(brief),
-      processor: 'core',
-      enable_events: true,
-      metadata: { session_id: sessionId },
       webhook: {
         url: `${supabaseUrl}/functions/v1/parallel-webhook`,
         event_types: ['task_run.status']

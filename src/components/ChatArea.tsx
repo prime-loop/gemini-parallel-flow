@@ -120,19 +120,20 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
   };
 
   const handleResearchQuery = async (messageContent: string, sessionId: string) => {
-    // Add research starting message
-    await addMessage('research', `🔍 **Starting Research**\n\nAnalyzing your query and dispatching to Parallel.ai for comprehensive research...\n\n*This may take several minutes for thorough results.*`, {
-      status: 'started'
+    // Add research starting message with animation
+    const researchingMessageId = await addMessage('research', `🔍 **Researching...**\n\n📋 **Query:** ${messageContent}\n\n🚀 **Status:** Dispatching to Parallel.ai\n⏱️ **Expected Duration:** 3-5 minutes\n\n*Please wait while we gather comprehensive information from multiple sources...*`, {
+      status: 'researching',
+      animated: true
     });
 
-    // Create research brief (simplified for now)
+    // Create research brief
     const brief = {
       objective: messageContent,
       constraints: [],
-      target_sources: ['academic', 'news', 'web'],
-      disallowed_sources: [],
+      target_sources: ['academic', 'news', 'web', 'technical_docs'],
+      disallowed_sources: ['social_media', 'forums'],
       timebox_minutes: 5,
-      expected_output_fields: ['summary', 'key_facts', 'sources'],
+      expected_output_fields: ['summary', 'key_facts', 'sources', 'recommendations'],
       summary: `Research request: ${messageContent}`
     };
 
@@ -146,7 +147,9 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to start research task');
+      const errorText = await response.text();
+      console.error('Research start error:', errorText);
+      throw new Error('Failed to start research task - check Parallel API configuration');
     }
 
     const result = await response.json();
@@ -155,11 +158,12 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
       throw new Error(result.error);
     }
 
-    // Update research message with task ID
-    await addMessage('research', `🔍 **Research Dispatched**\n\n**Task ID:** ${result.run_id}\n**Status:** ${result.status}\n\n*Research is now running in the background. Results will appear when ready.*\n\n[Monitor progress in Activity Panel →]`, {
+    // Update research message with success status
+    await addMessage('research', `✅ **Research Task Launched**\n\n📋 **Query:** ${messageContent}\n🆔 **Task ID:** ${result.run_id}\n🔄 **Status:** ${result.status}\n\n🔍 **Research is now running asynchronously...**\n*Results will stream in when ready. You can continue chatting while research completes.*`, {
       run_id: result.run_id,
       status: result.status,
-      sse_url: result.sse_url
+      sse_url: result.sse_url,
+      task_launched: true
     });
   };
 
