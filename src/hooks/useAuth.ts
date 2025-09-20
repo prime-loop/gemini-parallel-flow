@@ -1,20 +1,31 @@
 import { useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { useTestAuth } from './useTestAuth';
+
+// Mock data for Test Mode
+const TEST_USER: Partial<User> = {
+  id: '00000000-0000-4000-8000-000000000000',
+  email: 'test@example.com',
+};
+
+const TEST_SESSION: Partial<Session> = {
+  access_token: 'test-access-token',
+  token_type: 'bearer',
+  user: TEST_USER as User,
+};
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
-  const { isTestMode, testUser, testSession } = useTestAuth();
+  // Determine Test Mode synchronously on first render
+  const initialTestMode = typeof window !== 'undefined' && localStorage.getItem('research_copilot_test_mode') === 'true';
+
+  const [user, setUser] = useState<User | null>(initialTestMode ? (TEST_USER as User) : null);
+  const [session, setSession] = useState<Session | null>(initialTestMode ? (TEST_SESSION as Session) : null);
+  const [loading, setLoading] = useState(!initialTestMode);
+  const [isTestMode] = useState(initialTestMode);
 
   useEffect(() => {
     if (isTestMode) {
-      console.log('Test mode enabled, using mock user');
-      setUser(testUser as User);
-      setSession(testSession as Session);
-      setLoading(false);
+      // In test mode, no Supabase listeners; we’re already "authenticated"
       return;
     }
 
@@ -36,19 +47,23 @@ export function useAuth() {
     });
 
     return () => subscription.unsubscribe();
-  }, [isTestMode, testUser, testSession]);
+  }, [isTestMode]);
 
   const signIn = async (email: string, password: string) => {
+    if (isTestMode) return { error: null } as const;
+
     console.log('Attempting sign in for:', email);
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     console.log('Sign in result:', { data, error });
-    return { error };
+    return { error } as const;
   };
 
   const signUp = async (email: string, password: string) => {
+    if (isTestMode) return { error: null } as const;
+
     console.log('Attempting sign up for:', email);
     const redirectUrl = `${window.location.origin}/`;
     
@@ -60,12 +75,17 @@ export function useAuth() {
       }
     });
     console.log('Sign up result:', { data, error });
-    return { error };
+    return { error } as const;
   };
 
   const signOut = async () => {
+    if (isTestMode) {
+      localStorage.removeItem('research_copilot_test_mode');
+      window.location.reload();
+      return { error: null } as const;
+    }
     const { error } = await supabase.auth.signOut();
-    return { error };
+    return { error } as const;
   };
 
   return {
@@ -75,5 +95,6 @@ export function useAuth() {
     signIn,
     signUp,
     signOut,
+    isTestMode,
   };
 }
