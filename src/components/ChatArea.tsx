@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useMessages } from '@/hooks/useMessages';
 import { useSessions } from '@/hooks/useSessions';
+import { useLog } from '@/contexts/LogContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -14,6 +15,7 @@ interface ChatAreaProps {
 export function ChatArea({ sessionId }: ChatAreaProps) {
   const { messages, loading: messagesLoading, addMessage } = useMessages(sessionId);
   const { updateLastActivity } = useSessions();
+  const { addLog } = useLog();
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [researching, setResearching] = useState(false);
@@ -78,6 +80,10 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
 
     } catch (error) {
       console.error('Error sending message:', error);
+      addLog('error', 'Error processing message', 'frontend', { 
+        error: error.message,
+        messageType: shouldResearch ? 'research' : 'chat'
+      });
       await addMessage('system', `❌ **Error Processing Message**\n\nSorry, there was an error: ${error.message}\n\n*Click retry or try rephrasing your question.*`, {
         error: true,
         retryable: true
@@ -120,11 +126,15 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
   };
 
   const handleResearchQuery = async (messageContent: string, sessionId: string) => {
+    addLog('info', 'Starting research query processing', 'frontend', { query: messageContent, sessionId });
+    
     // Add research starting message with animation
     const researchingMessageId = await addMessage('research', `🔍 **Researching...**\n\n📋 **Query:** ${messageContent}\n\n🚀 **Status:** Dispatching to Parallel.ai\n⏱️ **Expected Duration:** 3-5 minutes\n\n*Please wait while we gather comprehensive information from multiple sources...*`, {
       status: 'researching',
       animated: true
     });
+
+    addLog('info', 'Research message added to chat', 'frontend');
 
     // Create research brief
     const brief = {
@@ -137,6 +147,13 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
       summary: `Research request: ${messageContent}`
     };
 
+    addLog('info', 'Research brief created', 'frontend', { brief });
+
+    addLog('info', 'Sending request to research-start API', 'api', { 
+      url: 'https://ebxnfsnpfdhfyyrajvli.supabase.co/functions/v1/research-start',
+      sessionId 
+    });
+
     const response = await fetch(`https://ebxnfsnpfdhfyyrajvli.supabase.co/functions/v1/research-start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -146,17 +163,35 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
       }),
     });
 
+    addLog('info', 'Received response from research-start API', 'api', { 
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
+    });
+
     if (!response.ok) {
       const errorText = await response.text();
+      addLog('error', 'Research start API error', 'api', { 
+        status: response.status,
+        error: errorText 
+      });
       console.error('Research start error:', errorText);
       throw new Error('Failed to start research task - check Parallel API configuration');
     }
 
     const result = await response.json();
     
+    addLog('info', 'Parsed response from research-start API', 'api', { result });
+    
     if (result.error) {
+      addLog('error', 'Error in research-start response', 'api', { error: result.error });
       throw new Error(result.error);
     }
+
+    addLog('success', 'Research task successfully created', 'api', { 
+      runId: result.run_id,
+      status: result.status 
+    });
 
     // Update research message with success status
     await addMessage('research', `✅ **Research Task Launched**\n\n📋 **Query:** ${messageContent}\n🆔 **Task ID:** ${result.run_id}\n🔄 **Status:** ${result.status}\n\n🔍 **Research is now running asynchronously...**\n*Results will stream in when ready. You can continue chatting while research completes.*`, {
@@ -165,6 +200,8 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
       sse_url: result.sse_url,
       task_launched: true
     });
+
+    addLog('success', 'Research task launched successfully', 'frontend', { runId: result.run_id });
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {

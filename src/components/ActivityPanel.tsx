@@ -3,7 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
+import { LogStream } from './LogStream';
 import { 
   Activity, 
   Clock, 
@@ -11,7 +13,8 @@ import {
   AlertCircle, 
   Loader2, 
   Play,
-  RefreshCw 
+  RefreshCw,
+  Terminal
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -140,119 +143,150 @@ export function ActivityPanel({ sessionId }: ActivityPanelProps) {
         </div>
       </div>
 
-      <ScrollArea className="flex-1 p-4">
-        <div className="space-y-6">
-          {/* System Status */}
-          {systemStatus && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">System Status</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Gemini API</span>
-                  <Badge variant={systemStatus.gemini_api === 'operational' ? 'default' : systemStatus.gemini_api === 'test_mode' ? 'secondary' : 'destructive'}>
-                    {systemStatus.gemini_api === 'operational' ? 'Connected' : systemStatus.gemini_api === 'test_mode' ? 'Test Mode' : 'Unknown'}
-                  </Badge>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Parallel API</span>
-                  <Badge variant={systemStatus.parallel_api === 'operational' ? 'default' : systemStatus.parallel_api === 'test_mode' ? 'secondary' : 'destructive'}>
-                    {systemStatus.parallel_api === 'operational' ? 'Connected' : systemStatus.parallel_api === 'test_mode' ? 'Test Mode' : 'Unknown'}
-                  </Badge>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Database</span>
-                  <Badge variant={systemStatus.database === 'operational' ? 'default' : systemStatus.database === 'test_mode' ? 'secondary' : 'destructive'}>
-                    {systemStatus.database === 'operational' ? 'Connected' : systemStatus.database === 'test_mode' ? 'Test Mode' : 'Unknown'}
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Research Tasks */}
-          {researchTasks.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Research Tasks</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {researchTasks.map((task) => (
-                  <div key={task.id} className="border rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">Task {task.id}</span>
-                      <Badge 
-                        variant="outline"
-                        className={`${getTaskStatusColor(task.status)} text-white`}
-                      >
-                        {task.status}
-                      </Badge>
-                    </div>
-                    
-                    {task.status === 'running' && task.progress.length > 0 && (
-                      <div className="space-y-1">
-                        {task.progress.slice(-3).map((progress, idx) => (
-                          <div key={idx} className="text-xs text-muted-foreground">
-                            {progress}
+      <div className="flex-1 p-4">
+        <Tabs defaultValue="activity" className="h-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="activity" className="flex items-center gap-2">
+              <Activity className="h-3 w-3" />
+              Activity
+            </TabsTrigger>
+            <TabsTrigger value="logs" className="flex items-center gap-2">
+              <Terminal className="h-3 w-3" />
+              Logs
+            </TabsTrigger>
+            <TabsTrigger value="status" className="flex items-center gap-2">
+              <CheckCircle className="h-3 w-3" />
+              Status
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="activity" className="h-full">
+            <ScrollArea className="h-full">
+              <div className="space-y-6">
+                {/* Research Tasks */}
+                {researchTasks.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm">Research Tasks</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {researchTasks.map((task) => (
+                        <div key={task.id} className="border rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium">Task {task.id}</span>
+                            <Badge 
+                              variant="outline"
+                              className={`${getTaskStatusColor(task.status)} text-white`}
+                            >
+                              {task.status}
+                            </Badge>
                           </div>
-                        ))}
+                          
+                          {task.status === 'running' && task.progress.length > 0 && (
+                            <div className="space-y-1">
+                              {task.progress.slice(-3).map((progress, idx) => (
+                                <div key={idx} className="text-xs text-muted-foreground">
+                                  {progress}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          
+                          <div className="text-xs text-muted-foreground mt-2">
+                            Started {formatDistanceToNow(new Date(task.startedAt), { addSuffix: true })}
+                          </div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Activity Log */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">What's Done</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {activities.length === 0 ? (
+                      <div className="text-sm text-muted-foreground text-center py-4">
+                        No activities yet. Start a conversation to see progress.
                       </div>
+                    ) : (
+                      activities.map((activity) => (
+                        <div key={activity.id} className="flex items-start gap-3">
+                          {getStatusIcon(activity.status)}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium">{activity.message}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
+                            </p>
+                          </div>
+                        </div>
+                      ))
                     )}
-                    
-                    <div className="text-xs text-muted-foreground mt-2">
-                      Started {formatDistanceToNow(new Date(task.startedAt), { addSuffix: true })}
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
+                  </CardContent>
+                </Card>
 
-          {/* Activity Log */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">What's Done</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {activities.length === 0 ? (
-                <div className="text-sm text-muted-foreground text-center py-4">
-                  No activities yet. Start a conversation to see progress.
-                </div>
-              ) : (
-                activities.map((activity) => (
-                  <div key={activity.id} className="flex items-start gap-3">
-                    {getStatusIcon(activity.status)}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium">{activity.message}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button variant="outline" size="sm" className="w-full justify-start">
-                <Play className="h-4 w-4 mr-2" />
-                Start Research
-              </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh Status
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </ScrollArea>
+                {/* Quick Actions */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Quick Actions</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <Button variant="outline" size="sm" className="w-full justify-start">
+                      <Play className="h-4 w-4 mr-2" />
+                      Start Research
+                    </Button>
+                    <Button variant="outline" size="sm" className="w-full justify-start">
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh Status
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            </ScrollArea>
+          </TabsContent>
+          
+          <TabsContent value="logs" className="h-full">
+            <LogStream sessionId={sessionId} />
+          </TabsContent>
+          
+          <TabsContent value="status" className="h-full">
+            <ScrollArea className="h-full">
+              <div className="space-y-6">
+                {/* System Status */}
+                {systemStatus && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm">System Status</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Gemini API</span>
+                        <Badge variant={systemStatus.gemini_api === 'operational' ? 'default' : systemStatus.gemini_api === 'test_mode' ? 'secondary' : 'destructive'}>
+                          {systemStatus.gemini_api === 'operational' ? 'Connected' : systemStatus.gemini_api === 'test_mode' ? 'Test Mode' : 'Unknown'}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>Parallel API</span>
+                        <Badge variant={systemStatus.parallel_api === 'operational' ? 'default' : systemStatus.parallel_api === 'test_mode' ? 'secondary' : 'destructive'}>
+                          {systemStatus.parallel_api === 'operational' ? 'Connected' : systemStatus.parallel_api === 'test_mode' ? 'Test Mode' : 'Unknown'}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>Database</span>
+                        <Badge variant={systemStatus.database === 'operational' ? 'default' : systemStatus.database === 'test_mode' ? 'secondary' : 'destructive'}>
+                          {systemStatus.database === 'operational' ? 'Connected' : systemStatus.database === 'test_mode' ? 'Test Mode' : 'Unknown'}
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </ScrollArea>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }
