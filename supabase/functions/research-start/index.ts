@@ -86,22 +86,18 @@ Please provide a comprehensive research report with summary, key facts, and sour
       headers: {
         'x-api-key': parallelApiKey,
         'Content-Type': 'application/json',
-        'parallel-beta': 'events-sse-2025-07-24'
+        'parallel-beta': 'events-sse-2025-07-24, webhook-2025-08-12'
       },
       body: JSON.stringify(parallelRequest),
     });
 
     console.log('Parallel API response status:', parallelResponse.status);
-
+    
     if (!parallelResponse.ok) {
-      const error = await parallelResponse.text();
-      console.error('Parallel API error:', {
-        status: parallelResponse.status,
-        statusText: parallelResponse.statusText,
-        error: error,
-        request: parallelRequest
-      });
-      throw new Error(`Parallel API error: ${parallelResponse.status} - ${error}`);
+      const errorText = await parallelResponse.text();
+      console.error('Parallel API error response:', errorText);
+
+      throw new Error(`Parallel API error: ${parallelResponse.status} - ${errorText}`);
     }
 
     const parallelData = await parallelResponse.json();
