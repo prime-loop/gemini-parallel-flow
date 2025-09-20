@@ -95,7 +95,7 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
   };
 
   const handleChatQuery = async (messageContent: string, sessionId: string) => {
-    const response = await fetch(`https://ebxnfsnpfdhfyyrajvli.supabase.co/functions/v1/chat-send`, {
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -154,7 +154,7 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
       sessionId 
     });
 
-    const response = await fetch(`https://ebxnfsnpfdhfyyrajvli.supabase.co/functions/v1/research-start`, {
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/research-start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

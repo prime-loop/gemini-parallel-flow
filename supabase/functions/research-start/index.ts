@@ -38,23 +38,6 @@ serve(async (req) => {
 
     // Create Parallel Task Run with correct payload structure
     const parallelRequest = {
-      task_spec: {
-        output_schema: {
-          type: 'object',
-          properties: {
-            summary: { type: 'string' },
-            key_facts: { 
-              type: 'array',
-              items: { type: 'string' }
-            },
-            sources: {
-              type: 'array', 
-              items: { type: 'string' }
-            }
-          },
-          required: ['summary', 'sources']
-        }
-      },
       input: `Research the following topic: ${brief.objective}
 
 Constraints: ${brief.constraints.join(', ')}
@@ -68,8 +51,27 @@ Please provide a comprehensive research report with summary, key facts, and sour
       enable_events: true,
       metadata: { 
         session_id: sessionId,
-        format: 'json',
-        research_brief: brief
+        format: 'json'
+      },
+      task_spec: {
+        output_schema: {
+          type: 'json',
+          json_schema: {
+            type: 'object',
+            properties: {
+              summary: { type: 'string' },
+              key_facts: { 
+                type: 'array',
+                items: { type: 'string' }
+              },
+              sources: {
+                type: 'array', 
+                items: { type: 'string' }
+              }
+            },
+            required: ['summary', 'sources']
+          }
+        }
       },
       webhook: {
         url: `${supabaseUrl}/functions/v1/parallel-webhook`,
@@ -84,9 +86,12 @@ Please provide a comprehensive research report with summary, key facts, and sour
       headers: {
         'x-api-key': parallelApiKey,
         'Content-Type': 'application/json',
+        'parallel-beta': 'events-sse-2025-07-24'
       },
       body: JSON.stringify(parallelRequest),
     });
+
+    console.log('Parallel API response status:', parallelResponse.status);
 
     if (!parallelResponse.ok) {
       const error = await parallelResponse.text();
