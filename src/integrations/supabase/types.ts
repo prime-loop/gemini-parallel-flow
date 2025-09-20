@@ -18,8 +18,6 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          last_activity: string
-          status: string | null
           title: string
           updated_at: string
           user_id: string | null
@@ -27,8 +25,6 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
-          last_activity?: string
-          status?: string | null
           title?: string
           updated_at?: string
           user_id?: string | null
@@ -36,11 +32,24 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
-          last_activity?: string
-          status?: string | null
           title?: string
           updated_at?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      demo_users: {
+        Row: {
+          created_at: string | null
+          id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
         }
         Relationships: []
       }
@@ -79,60 +88,39 @@ export type Database = {
           },
         ]
       }
-      profiles: {
-        Row: {
-          created_at: string
-          display_name: string | null
-          email: string | null
-          id: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          display_name?: string | null
-          email?: string | null
-          id?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          display_name?: string | null
-          email?: string | null
-          id?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       task_runs: {
         Row: {
+          brief_text: string
+          completed_at: string | null
           created_at: string
           id: string
-          last_event_id: string | null
-          parallel_run_id: string | null
+          metadata: Json | null
+          result: string | null
+          run_id: string
           session_id: string
-          status: string | null
-          updated_at: string
+          status: string
         }
         Insert: {
+          brief_text: string
+          completed_at?: string | null
           created_at?: string
           id?: string
-          last_event_id?: string | null
-          parallel_run_id?: string | null
+          metadata?: Json | null
+          result?: string | null
+          run_id: string
           session_id: string
-          status?: string | null
-          updated_at?: string
+          status?: string
         }
         Update: {
+          brief_text?: string
+          completed_at?: string | null
           created_at?: string
           id?: string
-          last_event_id?: string | null
-          parallel_run_id?: string | null
+          metadata?: Json | null
+          result?: string | null
+          run_id?: string
           session_id?: string
-          status?: string | null
-          updated_at?: string
+          status?: string
         }
         Relationships: [
           {
