@@ -8,28 +8,37 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 220 27% 98%;
-    --foreground: 220 9% 46%;
+    /* Modern sharp theme - neutral canvas with vibrant accents */
+    --surface: 0 0% 100%;
+    --surface-alt: 0 0% 98%;
+    --background: 0 0% 100%;
+    --foreground: 222 25% 8%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 9% 46%;
+    --card-foreground: 222 25% 8%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 9% 46%;
+    --popover-foreground: 222 25% 8%;
 
-    --primary: 248 53% 58%;
+    /* Grape accent - primary vibrant color */
+    --primary: 259 75% 60%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 220 9% 46%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 222 13% 30%;
 
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 222 13% 30%;
 
-    --accent: 174 100% 41%;
+    /* Mint accent - secondary vibrant color */
+    --accent: 174 100% 39%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84% 60%;
+    /* Amber accent - tertiary vibrant color */
+    --accent-amber: 43 96% 56%;
+    --accent-amber-foreground: 0 0% 100%;
+
+    --destructive: 0 65% 51%;
     --destructive-foreground: 0 0% 98%;
 
     --success: 142 76% 36%;
@@ -38,45 +47,61 @@ All colors MUST be HSL.
     --warning: 43 96% 56%;
     --warning-foreground: 0 0% 100%;
 
-    --border: 220 13% 91%;
+    /* Strong borders for sharp design */
+    --border: 220 13% 85%;
+    --border-strong: 220 13% 83%;
     --input: 220 13% 91%;
-    --ring: 248 53% 58%;
+    --ring: 174 100% 39%;
 
     --radius: 0.5rem;
+    --radius-card: 0.75rem;
 
-    --sidebar-background: 220 14% 96%;
-    --sidebar-foreground: 220 9% 46%;
-    --sidebar-primary: 248 53% 58%;
+    /* Sidebar tokens */
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 222 13% 30%;
+    --sidebar-primary: 259 75% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 14% 93%;
-    --sidebar-accent-foreground: 220 9% 46%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 248 53% 58%;
+    --sidebar-accent: 0 0% 94%;
+    --sidebar-accent-foreground: 222 13% 30%;
+    --sidebar-border: 220 13% 85%;
+    --sidebar-ring: 174 100% 39%;
+
+    /* Layout dimensions */
+    --header-height: 64px;
+    --sidebar-width: 320px;
+    --sidebar-collapsed-width: 56px;
+    --composer-height: auto;
+    --panel-height: 220px;
   }
 
   .dark {
-    --background: 225 39% 7%;
+    --surface: 222 47% 4%;
+    --surface-alt: 222 47% 6%;
+    --background: 222 47% 4%;
     --foreground: 220 14% 89%;
 
-    --card: 226 50% 8%;
+    --card: 222 47% 6%;
     --card-foreground: 220 14% 89%;
 
-    --popover: 226 50% 8%;
+    --popover: 222 47% 6%;
     --popover-foreground: 220 14% 89%;
 
-    --primary: 248 53% 58%;
+    --primary: 259 75% 60%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 215 25% 14%;
-    --secondary-foreground: 220 14% 89%;
+    --secondary: 222 20% 12%;
+    --secondary-foreground: 220 14% 75%;
 
-    --muted: 215 16% 16%;
+    --muted: 222 20% 12%;
     --muted-foreground: 220 9% 60%;
 
-    --accent: 174 100% 41%;
+    --accent: 174 100% 39%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 63% 31%;
+    --accent-amber: 43 96% 56%;
+    --accent-amber-foreground: 0 0% 100%;
+
+    --destructive: 0 65% 51%;
     --destructive-foreground: 0 86% 97%;
 
     --success: 142 76% 36%;
@@ -85,18 +110,19 @@ All colors MUST be HSL.
     --warning: 43 96% 56%;
     --warning-foreground: 0 0% 100%;
 
-    --border: 215 28% 17%;
-    --input: 215 28% 17%;
-    --ring: 248 53% 58%;
+    --border: 222 20% 18%;
+    --border-strong: 222 20% 20%;
+    --input: 222 20% 18%;
+    --ring: 174 100% 39%;
 
-    --sidebar-background: 224 71% 4%;
+    --sidebar-background: 222 47% 6%;
     --sidebar-foreground: 220 9% 60%;
-    --sidebar-primary: 248 53% 58%;
+    --sidebar-primary: 259 75% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 215 25% 14%;
-    --sidebar-accent-foreground: 220 14% 89%;
-    --sidebar-border: 215 28% 17%;
-    --sidebar-ring: 248 53% 58%;
+    --sidebar-accent: 222 20% 12%;
+    --sidebar-accent-foreground: 220 14% 75%;
+    --sidebar-border: 222 20% 18%;
+    --sidebar-ring: 174 100% 39%;
   }
 }
 
@@ -107,5 +133,60 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    overflow: hidden; /* Prevent main window scroll */
+  }
+
+  /* Fixed viewport layout */
+  .viewport-layout {
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .viewport-header {
+    height: var(--header-height);
+    flex-shrink: 0;
+  }
+
+  .viewport-body {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+  }
+
+  /* Sidebar transitions */
+  .sidebar-transition {
+    transition: width 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sidebar-transition {
+      transition: none;
+    }
+  }
+
+  /* Focus ring always visible */
+  *:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  /* Custom scrollbars */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(var(--border-strong));
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
   }
 }
