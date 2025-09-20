@@ -14,16 +14,30 @@ export default function AuthPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [testMode, setTestMode] = useState(false);
+
+  const handleTestMode = () => {
+    // Enable test mode
+    localStorage.setItem('research_copilot_test_mode', 'true');
+    window.location.reload(); // Force reload to trigger auth state change
+  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
+    console.log('Sign in form submitted with:', { email, password: password ? '***' : 'empty' });
+
     const { error } = await signIn(email, password);
     
     if (error) {
-      setError(error.message);
+      console.error('Sign in error:', error);
+      if (error.message.includes('Invalid login credentials')) {
+        setError('Invalid email or password. Please check your credentials or sign up for a new account.');
+      } else {
+        setError(error.message);
+      }
     }
     
     setLoading(false);
@@ -34,12 +48,15 @@ export default function AuthPage() {
     setLoading(true);
     setError('');
 
+    console.log('Sign up form submitted with:', { email, password: password ? '***' : 'empty' });
+
     const { error } = await signUp(email, password);
     
     if (error) {
-      setError(error.message);
+      console.error('Sign up error:', error);
+      setError(`Sign up failed: ${error.message}`);
     } else {
-      setError('Check your email for the confirmation link!');
+      setError('Success! Check your email for the confirmation link to complete registration.');
     }
     
     setLoading(false);
@@ -134,6 +151,18 @@ export default function AuthPage() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
+
+            <div className="mt-6 pt-4 border-t border-border">
+              <p className="text-sm text-muted-foreground mb-3">For testing during development:</p>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={handleTestMode}
+                className="w-full"
+              >
+                Enter Test Mode (Skip Auth)
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
