@@ -3,14 +3,9 @@ import { useMessages } from '@/hooks/useMessages';
 import { useSessions } from '@/hooks/useSessions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Loader2, User, Bot, Search, Webhook, AlertTriangle } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
-import { formatDistanceToNow } from 'date-fns';
+import { MessageCard } from '@/components/MessageCard';
+import { Send, Loader2, Bot, Search } from 'lucide-react';
 
 interface ChatAreaProps {
   sessionId: string | null;
@@ -21,7 +16,9 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
   const { updateLastActivity } = useSessions();
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [researching, setResearching] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -31,12 +28,38 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
     scrollToBottom();
   }, [messages]);
 
+  // Auto-focus input after AI response
+  useEffect(() => {
+    if (!sending && !researching && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [sending, researching]);
+
+  const isResearchQuery = (message: string): boolean => {
+    const researchKeywords = [
+      'research', 'analyze', 'investigate', 'study', 'explore', 'examine',
+      'find information', 'gather data', 'look into', 'comprehensive',
+      'detailed analysis', 'in-depth', 'thorough', 'compare', 'contrast'
+    ];
+    
+    const lowerMessage = message.toLowerCase();
+    return researchKeywords.some(keyword => lowerMessage.includes(keyword)) ||
+           message.length > 100; // Long queries likely need research
+  };
+
   const handleSendMessage = async () => {
-    if (!input.trim() || !sessionId || sending) return;
+    if (!input.trim() || !sessionId || sending || researching) return;
 
     const messageContent = input.trim();
     setInput('');
-    setSending(true);
+    
+    const shouldResearch = isResearchQuery(messageContent);
+    
+    if (shouldResearch) {
+      setResearching(true);
+    } else {
+      setSending(true);
+    }
 
     try {
       // Add user message
@@ -45,34 +68,99 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
       // Update session activity
       await updateLastActivity(sessionId);
 
-      // Call chat API
-      const response = await fetch(`https://ebxnfsnpfdhfyyrajvli.supabase.co/functions/v1/chat-send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId,
-          message: messageContent,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get AI response');
+      if (shouldResearch) {
+        // Trigger Parallel.ai research
+        await handleResearchQuery(messageContent, sessionId);
+      } else {
+        // Regular chat with Gemini
+        await handleChatQuery(messageContent, sessionId);
       }
-
-      const result = await response.json();
-      
-      // Add assistant message  
-      await addMessage('assistant', result.content, {
-        tokens: result.tokens,
-        model: result.model || 'gemini-2.5-flash'
-      });
 
     } catch (error) {
       console.error('Error sending message:', error);
-      await addMessage('system', 'Sorry, there was an error processing your message. Please try again.');
+      await addMessage('system', `❌ **Error Processing Message**\n\nSorry, there was an error: ${error.message}\n\n*Click retry or try rephrasing your question.*`, {
+        error: true,
+        retryable: true
+      });
     } finally {
       setSending(false);
+      setResearching(false);
     }
+  };
+
+  const handleChatQuery = async (messageContent: string, sessionId: string) => {
+    const response = await fetch(`https://ebxnfsnpfdhfyyrajvli.supabase.co/functions/v1/chat-send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId,
+        message: messageContent,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get AI response');
+    }
+
+    const result = await response.json();
+    
+    if (result.error) {
+      throw new Error(result.error);
+    }
+
+    if (!result.content || result.content === 'No response generated') {
+      throw new Error('AI returned no response. This could be due to API limits or content policy. Please try rephrasing your question.');
+    }
+    
+    // Add assistant message  
+    await addMessage('assistant', result.content, {
+      tokens: result.tokens,
+      model: result.model || 'gemini-2.5-flash'
+    });
+  };
+
+  const handleResearchQuery = async (messageContent: string, sessionId: string) => {
+    // Add research starting message
+    await addMessage('research', `🔍 **Starting Research**\n\nAnalyzing your query and dispatching to Parallel.ai for comprehensive research...\n\n*This may take several minutes for thorough results.*`, {
+      status: 'started'
+    });
+
+    // Create research brief (simplified for now)
+    const brief = {
+      objective: messageContent,
+      constraints: [],
+      target_sources: ['academic', 'news', 'web'],
+      disallowed_sources: [],
+      timebox_minutes: 5,
+      expected_output_fields: ['summary', 'key_facts', 'sources'],
+      summary: `Research request: ${messageContent}`
+    };
+
+    const response = await fetch(`https://ebxnfsnpfdhfyyrajvli.supabase.co/functions/v1/research-start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId,
+        brief
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to start research task');
+    }
+
+    const result = await response.json();
+    
+    if (result.error) {
+      throw new Error(result.error);
+    }
+
+    // Update research message with task ID
+    await addMessage('research', `🔍 **Research Dispatched**\n\n**Task ID:** ${result.run_id}\n**Status:** ${result.status}\n\n*Research is now running in the background. Results will appear when ready.*\n\n[Monitor progress in Activity Panel →]`, {
+      run_id: result.run_id,
+      status: result.status,
+      sse_url: result.sse_url
+    });
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -121,19 +209,23 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
       <div className="p-4 border-t border-border">
         <div className="flex gap-2">
           <Input
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Ask a research question..."
-            disabled={sending}
+            placeholder={researching ? "Research in progress..." : "Ask a question or request research..."}
+            disabled={sending || researching}
             className="flex-1"
           />
           <Button 
             onClick={handleSendMessage} 
-            disabled={sending || !input.trim()}
+            disabled={sending || researching || !input.trim()}
+            variant={isResearchQuery(input) ? "default" : "secondary"}
           >
-            {sending ? (
+            {sending || researching ? (
               <Loader2 className="h-4 w-4 animate-spin" />
+            ) : isResearchQuery(input) ? (
+              <Search className="h-4 w-4" />
             ) : (
               <Send className="h-4 w-4" />
             )}
@@ -141,85 +233,5 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
         </div>
       </div>
     </div>
-  );
-}
-
-function MessageCard({ message }: { message: any }) {
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case 'user':
-        return <User className="h-4 w-4" />;
-      case 'assistant':
-        return <Bot className="h-4 w-4" />;
-      case 'research':
-        return <Search className="h-4 w-4" />;
-      case 'webhook':
-        return <Webhook className="h-4 w-4" />;
-      case 'system':
-        return <AlertTriangle className="h-4 w-4" />;
-      default:
-        return <Bot className="h-4 w-4" />;
-    }
-  };
-
-  const getRoleBadgeVariant = (role: string) => {
-    switch (role) {
-      case 'user':
-        return 'default';
-      case 'assistant':
-        return 'secondary';
-      case 'research':
-        return 'outline';
-      case 'system':
-        return 'destructive';
-      default:
-        return 'secondary';
-    }
-  };
-
-  return (
-    <Card className="w-full">
-      <CardContent className="p-4">
-        <div className="flex items-start gap-3">
-          <div className="flex items-center gap-2 mb-2">
-            {getRoleIcon(message.role)}
-            <Badge variant={getRoleBadgeVariant(message.role)} className="capitalize">
-              {message.role}
-            </Badge>
-            <span className="text-xs text-muted-foreground">
-              {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
-            </span>
-          </div>
-        </div>
-        
-        <div className="prose prose-sm max-w-none dark:prose-invert">
-          <ReactMarkdown
-            components={{
-              code(props) {
-                const { children, className, node, ...rest } = props;
-                const match = /language-(\w+)/.exec(className || '');
-                return match ? (
-                  <div className="bg-muted rounded p-2 overflow-auto">
-                    <code className="text-sm">{String(children)}</code>
-                  </div>
-                ) : (
-                  <code className={className} {...rest}>
-                    {children}
-                  </code>
-                );
-              },
-            }}
-          >
-            {message.content}
-          </ReactMarkdown>
-        </div>
-        
-        {message.metadata?.tokens && (
-          <div className="text-xs text-muted-foreground mt-2">
-            Tokens: {message.metadata.tokens}
-          </div>
-        )}
-      </CardContent>
-    </Card>
   );
 }

@@ -58,8 +58,7 @@ export function useSessions() {
     if (isTestMode) {
       const list = loadTestSessions()
         .filter(s => s.status === 'active')
-        .sort((a, b) => (b.last_activity > a.last_activity ? 1 : -1))
-        .slice(0, 3);
+        .sort((a, b) => (b.last_activity > a.last_activity ? 1 : -1));
       setSessions(list);
       setLoading(false);
       return;
@@ -70,8 +69,7 @@ export function useSessions() {
         .from('chat_sessions')
         .select('*')
         .eq('status', 'active')
-        .order('last_activity', { ascending: false })
-        .limit(3);
+        .order('last_activity', { ascending: false });
 
       if (error) throw error;
       setSessions((data || []) as ChatSession[]);
@@ -96,7 +94,7 @@ export function useSessions() {
       const list = [created, ...loadTestSessions()]
         .filter((s, idx, arr) => arr.findIndex(x => x.id === s.id) === idx);
       saveTestSessions(list);
-      setSessions(list.filter(s => s.status === 'active').slice(0, 3));
+      setSessions(list.filter(s => s.status === 'active'));
       return created;
     }
 
