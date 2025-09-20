@@ -217,11 +217,11 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-background">
-      {/* Messages */}
-      <div className="flex-1 overflow-hidden">
-        <ScrollArea className="h-full custom-scrollbar">
-          <div className="p-4 space-y-4">
+    <div className="h-full flex flex-col bg-background">
+      {/* Messages - scrollable area */}
+      <div className="flex-1 min-h-0">
+        <ScrollArea className="h-full">
+          <div className="p-4 space-y-4 min-h-full">
             {messagesLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -241,9 +241,9 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
         </ScrollArea>
       </div>
 
-      {/* Input */}
-      <div className="p-4 border-t border-border">
-        <div className="flex gap-2">
+      {/* Input - always visible at bottom */}
+      <div className="shrink-0 p-4 border-t border-border bg-background">
+        <div className="flex gap-2 max-w-4xl mx-auto">
           <Input
             ref={inputRef}
             value={input}
@@ -251,12 +251,13 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
             onKeyPress={handleKeyPress}
             placeholder={researching ? "Research in progress..." : "Ask a question or request research..."}
             disabled={sending || researching}
-            className="flex-1"
+            className="flex-1 h-10"
           />
           <Button 
             onClick={handleSendMessage} 
             disabled={sending || researching || !input.trim()}
             variant={isResearchQuery(input) ? "default" : "secondary"}
+            className="h-10 px-3"
           >
             {sending || researching ? (
               <Loader2 className="h-4 w-4 animate-spin" />
