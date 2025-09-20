@@ -12,13 +12,40 @@ export interface Message {
 }
 
 export function useMessages(sessionId: string | null) {
-  const { user } = useAuth();
+  const { user, isTestMode } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // ------- Test Mode helpers (localStorage-backed) -------
+  const TEST_MESSAGES_KEY = 'research_copilot_test_messages';
+
+  type MessageMap = Record<string, Message[]>;
+
+  const loadTestMessages = (): MessageMap => {
+    try {
+      const raw = localStorage.getItem(TEST_MESSAGES_KEY);
+      return raw ? (JSON.parse(raw) as MessageMap) : {};
+    } catch {
+      return {} as MessageMap;
+    }
+  };
+
+  const saveTestMessages = (map: MessageMap) => {
+    localStorage.setItem(TEST_MESSAGES_KEY, JSON.stringify(map));
+  };
 
   const fetchMessages = async () => {
     if (!sessionId || !user) {
       setMessages([]);
+      setLoading(false);
+      return;
+    }
+
+    // Test Mode: load from localStorage
+    if (isTestMode) {
+      const map = loadTestMessages();
+      const list = (map[sessionId] || []).slice().sort((a, b) => (a.created_at > b.created_at ? 1 : -1));
+      setMessages(list);
       setLoading(false);
       return;
     }
@@ -42,11 +69,11 @@ export function useMessages(sessionId: string | null) {
 
   useEffect(() => {
     fetchMessages();
-  }, [sessionId, user]);
+  }, [sessionId, user, isTestMode]);
 
   // Real-time subscription
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || isTestMode) return;
 
     const channel = supabase
       .channel('messages')
@@ -85,7 +112,7 @@ export function useMessages(sessionId: string | null) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [sessionId]);
+  }, [sessionId, isTestMode]);
 
   const addMessage = async (
     role: Message['role'],
@@ -93,6 +120,26 @@ export function useMessages(sessionId: string | null) {
     metadata: Record<string, any> = {}
   ) => {
     if (!sessionId || !user) throw new Error('Session or user not available');
+
+    // Test Mode: store locally
+    if (isTestMode) {
+      const now = new Date().toISOString();
+      const newMsg: Message = {
+        id: crypto?.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+        session_id: sessionId,
+        role,
+        content,
+        metadata,
+        created_at: now,
+      };
+      const map = loadTestMessages();
+      const list = map[sessionId] || [];
+      const next = [...list, newMsg];
+      map[sessionId] = next;
+      saveTestMessages(map);
+      setMessages(next);
+      return newMsg;
+    }
 
     try {
       const { data, error } = await supabase

@@ -13,13 +13,54 @@ export interface ChatSession {
 }
 
 export function useSessions() {
-  const { user } = useAuth();
+  const { user, isTestMode } = useAuth();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // ------- Test Mode helpers (localStorage-backed) -------
+  const TEST_SESSIONS_KEY = 'research_copilot_test_sessions';
+
+  const loadTestSessions = (): ChatSession[] => {
+    try {
+      const raw = localStorage.getItem(TEST_SESSIONS_KEY);
+      const parsed = raw ? (JSON.parse(raw) as ChatSession[]) : [];
+      return parsed;
+    } catch {
+      return [];
+    }
+  };
+
+  const saveTestSessions = (list: ChatSession[]) => {
+    localStorage.setItem(TEST_SESSIONS_KEY, JSON.stringify(list));
+  };
+
+  const createTestSession = (title: string): ChatSession => {
+    const now = new Date().toISOString();
+    return {
+      id: crypto?.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+      title,
+      user_id: user?.id || '00000000-0000-4000-8000-000000000000',
+      status: 'active',
+      created_at: now,
+      updated_at: now,
+      last_activity: now,
+    };
+  };
 
   const fetchSessions = async () => {
     if (!user) {
       setSessions([]);
+      setLoading(false);
+      return;
+    }
+
+    // Test Mode: load from localStorage
+    if (isTestMode) {
+      const list = loadTestSessions()
+        .filter(s => s.status === 'active')
+        .sort((a, b) => (b.last_activity > a.last_activity ? 1 : -1))
+        .slice(0, 3);
+      setSessions(list);
       setLoading(false);
       return;
     }
@@ -44,10 +85,20 @@ export function useSessions() {
 
   useEffect(() => {
     fetchSessions();
-  }, [user]);
+  }, [user, isTestMode]);
 
   const createSession = async (title: string = 'New Session') => {
     if (!user) throw new Error('User not authenticated');
+
+    // Test Mode: create locally
+    if (isTestMode) {
+      const created = createTestSession(title);
+      const list = [created, ...loadTestSessions()]
+        .filter((s, idx, arr) => arr.findIndex(x => x.id === s.id) === idx);
+      saveTestSessions(list);
+      setSessions(list.filter(s => s.status === 'active').slice(0, 3));
+      return created;
+    }
 
     try {
       const { data, error } = await supabase
@@ -60,7 +111,6 @@ export function useSessions() {
         .single();
 
       if (error) throw error;
-      
       await fetchSessions();
       return data;
     } catch (error) {
@@ -70,6 +120,15 @@ export function useSessions() {
   };
 
   const updateSessionTitle = async (sessionId: string, title: string) => {
+    // Test Mode
+    if (isTestMode) {
+      const list = loadTestSessions();
+      const next: ChatSession[] = list.map(s => (s.id === sessionId ? { ...s, title, updated_at: new Date().toISOString() } : s)) as ChatSession[];
+      saveTestSessions(next);
+      setSessions(prev => prev.map(s => (s.id === sessionId ? { ...s, title } : s)));
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('chat_sessions')
@@ -90,6 +149,16 @@ export function useSessions() {
   };
 
   const updateLastActivity = async (sessionId: string) => {
+    // Test Mode
+    if (isTestMode) {
+      const now = new Date().toISOString();
+      const list = loadTestSessions();
+      const next: ChatSession[] = list.map(s => (s.id === sessionId ? { ...s, last_activity: now, updated_at: now } : s)) as ChatSession[];
+      saveTestSessions(next);
+      setSessions(prev => prev.map(s => (s.id === sessionId ? { ...s, last_activity: now } : s)));
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('chat_sessions')
@@ -103,6 +172,15 @@ export function useSessions() {
   };
 
   const archiveSession = async (sessionId: string) => {
+    // Test Mode
+    if (isTestMode) {
+      const list = loadTestSessions();
+      const next: ChatSession[] = list.map(s => (s.id === sessionId ? { ...s, status: 'archived', updated_at: new Date().toISOString() } : s)) as ChatSession[];
+      saveTestSessions(next);
+      await fetchSessions();
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('chat_sessions')
