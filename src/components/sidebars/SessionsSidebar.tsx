@@ -16,7 +16,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { 
   Plus, 
@@ -27,11 +26,7 @@ import {
   Loader2,
   Search,
   Trash2,
-  Archive,
-  MoreVertical,
-  PlayCircle,
-  CheckCircle,
-  XCircle
+  PlayCircle
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -39,6 +34,7 @@ interface SessionsSidebarProps {
   currentSessionId: string | null;
   onSelectSession: (sessionId: string) => void;
   onNewSession: () => void;
+  onDeleteSession?: (sessionId: string) => void;
   collapsed?: boolean;
 }
 
@@ -46,6 +42,7 @@ export function SessionsSidebar({
   currentSessionId, 
   onSelectSession, 
   onNewSession,
+  onDeleteSession,
   collapsed = false 
 }: SessionsSidebarProps) {
   const { sessions, loading } = useSessions();
@@ -58,6 +55,13 @@ export function SessionsSidebar({
     setSigningOut(true);
     await signOut();
     setSigningOut(false);
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    if (onDeleteSession) {
+      await onDeleteSession(sessionId);
+    }
+    setDeleteTarget(null);
   };
 
   const filteredSessions = sessions.filter(session =>
@@ -75,6 +79,7 @@ export function SessionsSidebar({
           onClick={onNewSession}
           size="sm"
           className="h-10 w-10 p-0"
+          title="New Session"
         >
           <Plus className="h-4 w-4" />
         </Button>
@@ -87,6 +92,7 @@ export function SessionsSidebar({
               size="sm"
               onClick={() => onSelectSession(session.id)}
               className="h-10 w-10 p-0"
+              title={session.title}
             >
               <MessageSquare className="h-4 w-4" />
             </Button>
@@ -106,6 +112,7 @@ export function SessionsSidebar({
             onClick={handleSignOut}
             disabled={signingOut}
             className="h-10 w-10 p-0"
+            title="Sign Out"
           >
             {signingOut ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -171,7 +178,7 @@ export function SessionsSidebar({
                 </Card>
               ) : (
                 sortedSessions.map((session, index) => (
-                  <div key={session.id}>
+                  <div key={session.id} className="group">
                     <SessionCard
                       session={session}
                       isActive={session.id === currentSessionId}
@@ -220,19 +227,16 @@ export function SessionsSidebar({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Session</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the session and all its messages. This action cannot be undone.
+              This will permanently delete the session and all its messages, research tasks, and related data. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={() => {
-                // TODO: Implement session deletion
-                setDeleteTarget(null);
-              }}
+              onClick={() => deleteTarget && handleDeleteSession(deleteTarget)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              Delete Permanently
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -267,7 +271,7 @@ function SessionCard({
 
   return (
     <Card 
-      className={`cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/80 hover:shadow-sm ${
+      className={`cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/80 hover:shadow-sm group ${
         isActive 
           ? 'bg-sidebar-accent border-sidebar-primary shadow-sm' 
           : 'bg-sidebar-accent/30 hover:border-sidebar-border'
@@ -288,7 +292,8 @@ function SessionCard({
                 e.stopPropagation();
                 onDelete();
               }}
-              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-opacity"
+              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all duration-200"
+              title="Delete session"
             >
               <Trash2 className="h-3 w-3" />
             </Button>

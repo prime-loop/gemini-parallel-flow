@@ -76,9 +76,9 @@ export function FixedViewportLayout({
   }, [onTransportConsoleToggle]);
 
   return (
-    <div className="viewport-layout">
+    <div className="h-screen w-full flex flex-col bg-background overflow-hidden">
       {/* Fixed Header */}
-      <header className="viewport-header bg-surface border-b border-border-strong px-4 flex items-center justify-between">
+      <header className="h-header bg-surface border-b border-border-strong px-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <Brain className="h-6 w-6 text-primary" />
@@ -152,8 +152,8 @@ export function FixedViewportLayout({
         </div>
       </header>
 
-      {/* Body with sidebars */}
-      <div className="viewport-body">
+      {/* Body with sidebars - perfectly aligned */}
+      <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar */}
         <aside 
           className={`sidebar-transition bg-sidebar border-r border-sidebar-border flex-shrink-0 ${
@@ -163,7 +163,7 @@ export function FixedViewportLayout({
           {leftSidebar}
         </aside>
 
-        {/* Main Content */}
+        {/* Main Content - perfectly centered */}
         <main className="flex-1 flex flex-col overflow-hidden">
           {children}
         </main>

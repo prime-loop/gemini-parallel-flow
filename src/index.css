@@ -134,25 +134,16 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
     overflow: hidden; /* Prevent main window scroll */
+    margin: 0;
+    padding: 0;
   }
 
-  /* Fixed viewport layout */
-  .viewport-layout {
-    height: 100vh;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .viewport-header {
-    height: var(--header-height);
-    flex-shrink: 0;
-  }
-
-  .viewport-body {
-    flex: 1;
-    overflow: hidden;
-    display: flex;
+  /* Remove any default spacing that could cause uplift */
+  html, body, #root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
   }
 
   /* Sidebar transitions */
