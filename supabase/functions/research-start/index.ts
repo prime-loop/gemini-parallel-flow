@@ -36,6 +36,47 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
     const { sessionId, brief }: ResearchRequest = await req.json();
 
+    console.log('🔍 Validating session and inputs:', { 
+      sessionId, 
+      briefObjective: brief?.objective?.substring(0, 100) + '...' 
+    });
+
+    // Verify session exists before proceeding
+    const { data: sessionData, error: sessionError } = await supabase
+      .from('chat_sessions')
+      .select('id, title')
+      .eq('id', sessionId)
+      .single();
+
+    if (sessionError || !sessionData) {
+      console.error('❌ Session validation failed:', {
+        sessionId,
+        error: sessionError,
+        data: sessionData
+      });
+      
+      // Create the session if it doesn't exist
+      console.log('🆕 Creating missing session...');
+      const { data: newSession, error: createError } = await supabase
+        .from('chat_sessions')
+        .insert({
+          id: sessionId,
+          title: 'Research Session',
+          user_id: null // For demo mode
+        })
+        .select()
+        .single();
+        
+      if (createError) {
+        console.error('❌ Failed to create session:', createError);
+        throw new Error(`Failed to create session: ${createError.message}`);
+      }
+      
+      console.log('✅ Created new session:', newSession);
+    } else {
+      console.log('✅ Session validated:', sessionData);
+    }
+
     // Create Parallel Task Run with correct payload structure
     const parallelRequest = {
       input: `Research the following topic: ${brief.objective}
