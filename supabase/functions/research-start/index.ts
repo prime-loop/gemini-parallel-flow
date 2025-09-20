@@ -79,44 +79,24 @@ serve(async (req) => {
 
     // Create Parallel Task Run with correct payload structure
     const parallelRequest = {
-      input: `Research the following topic: ${brief.objective}
-
-Constraints: ${brief.constraints.join(', ')}
-Target sources: ${brief.target_sources.join(', ')}
-Avoid sources: ${brief.disallowed_sources.join(', ')}
-Time limit: ${brief.timebox_minutes} minutes
-Expected output: ${brief.expected_output_fields.join(', ')}
-
-Please provide a comprehensive research report with summary, key facts, and sources.`,
-      processor: 'core',
-      enable_events: true,
-      metadata: { 
-        session_id: sessionId,
-        format: 'json'
-      },
-      task_spec: {
-        output_schema: {
-          type: 'json',
-          json_schema: {
-            type: 'object',
-            properties: {
-              summary: { type: 'string' },
-              key_facts: { 
-                type: 'array',
-                items: { type: 'string' }
-              },
-              sources: {
-                type: 'array', 
-                items: { type: 'string' }
-              }
-            },
-            required: ['summary', 'sources']
-          }
-        }
-      },
+      input: brief.objective,
+      processor: 'core', // Use 'core' processor for research tasks
+      enable_events: true, // Enable SSE events
       webhook: {
         url: `${supabaseUrl}/functions/v1/parallel-webhook`,
         event_types: ['task_run.status']
+      },
+      output_schema: {
+        type: 'object',
+        properties: {
+          company: { type: 'string' },
+          HQ_region: { type: 'string' },
+          EU_risk_drivers: { type: 'array', items: { type: 'string' } },
+          use_cases: { type: 'array', items: { type: 'string' } },
+          current_tools: { type: 'array', items: { type: 'string' } },
+          buyer_roles: { type: 'array', items: { type: 'object' } },
+          sources: { type: 'array', items: { type: 'string' } }
+        }
       }
     };
 
@@ -129,9 +109,9 @@ Please provide a comprehensive research report with summary, key facts, and sour
       parallelResponse = await fetch('https://api.parallel.ai/v1/tasks/runs', {
         method: 'POST',
         headers: {
-          'x-api-key': parallelApiKey,
           'Content-Type': 'application/json',
-          'parallel-beta': 'events-sse-2025-07-24, webhook-2025-08-12'
+          'x-api-key': parallelApiKey,
+          'parallel-beta': 'webhook-2025-08-12,events-sse-2025-07-24', // Enable webhooks and SSE
         },
         body: JSON.stringify(parallelRequest),
       });

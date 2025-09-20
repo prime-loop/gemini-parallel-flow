@@ -5,7 +5,7 @@ import { useAuth } from './useAuth';
 export interface Message {
   id: string;
   session_id: string;
-  role: 'user' | 'assistant' | 'research' | 'system' | 'webhook';
+  role: 'user' | 'assistant' | 'research' | 'research_progress' | 'system' | 'webhook';
   content: string;
   metadata: Record<string, any>;
   created_at: string;

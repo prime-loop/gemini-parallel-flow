@@ -128,13 +128,7 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
   const handleResearchQuery = async (messageContent: string, sessionId: string) => {
     addLog('info', 'Starting research query processing', 'frontend', { query: messageContent, sessionId });
     
-    // Add research starting message with animation
-    const researchingMessageId = await addMessage('research', `🔍 **Researching...**\n\n📋 **Query:** ${messageContent}\n\n🚀 **Status:** Dispatching to Parallel.ai\n⏱️ **Expected Duration:** 3-5 minutes\n\n*Please wait while we gather comprehensive information from multiple sources...*`, {
-      status: 'researching',
-      animated: true
-    });
-
-    addLog('info', 'Research message added to chat', 'frontend');
+    addLog('info', 'Research brief created', 'frontend');
 
     // Create research brief
     const brief = {
@@ -147,14 +141,12 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
       summary: `Research request: ${messageContent}`
     };
 
-    addLog('info', 'Research brief created', 'frontend', { brief });
-
     addLog('info', 'Sending request to research-start API', 'api', { 
-      url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/research-start`,
+      url: `https://crdvvzncxicklblypvnz.supabase.co/functions/v1/research-start`,
       sessionId 
     });
 
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/research-start`, {
+    const response = await fetch(`https://crdvvzncxicklblypvnz.supabase.co/functions/v1/research-start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -193,12 +185,13 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
       status: result.status 
     });
 
-    // Update research message with success status
-    await addMessage('research', `✅ **Research Task Launched**\n\n📋 **Query:** ${messageContent}\n🆔 **Task ID:** ${result.run_id}\n🔄 **Status:** ${result.status}\n\n🔍 **Research is now running asynchronously...**\n*Results will stream in when ready. You can continue chatting while research completes.*`, {
+    // Add research progress UI message
+    await addMessage('research_progress', messageContent, {
       run_id: result.run_id,
       status: result.status,
       sse_url: result.sse_url,
-      task_launched: true
+      task_launched: true,
+      query: messageContent
     });
 
     addLog('success', 'Research task launched successfully', 'frontend', { runId: result.run_id });

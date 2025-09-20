@@ -6,11 +6,13 @@ import ReactMarkdown from 'react-markdown';
 import { formatDistanceToNow } from 'date-fns';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { ResearchProgressUI } from './ResearchProgressUI';
+import { motion } from 'framer-motion';
 
 interface MessageCardProps {
   message: {
     id: string;
-    role: 'user' | 'assistant' | 'research' | 'system' | 'webhook';
+    role: 'user' | 'assistant' | 'research' | 'research_progress' | 'system' | 'webhook';
     content: string;
     metadata: Record<string, any>;
     created_at: string;
@@ -29,6 +31,7 @@ export function MessageCard({ message, onRetry }: MessageCardProps) {
       case 'assistant':
         return <Bot className="h-4 w-4" />;
       case 'research':
+      case 'research_progress':
         return <Search className="h-4 w-4" />;
       case 'webhook':
         return <Webhook className="h-4 w-4" />;
@@ -39,13 +42,14 @@ export function MessageCard({ message, onRetry }: MessageCardProps) {
     }
   };
 
-  const getRoleBadgeVariant = (role: string) => {
+  const getRoleBadgeVariant = (role: string): 'default' | 'secondary' | 'outline' | 'destructive' => {
     switch (role) {
       case 'user':
         return 'default';
       case 'assistant':
         return 'secondary';
       case 'research':
+      case 'research_progress':
         return 'outline';
       case 'system':
         return message.metadata?.error ? 'destructive' : 'secondary';
@@ -117,25 +121,65 @@ export function MessageCard({ message, onRetry }: MessageCardProps) {
         </div>
         
         <div className="prose prose-sm max-w-none dark:prose-invert">
-          <ReactMarkdown
-            components={{
-              code(props) {
-                const { children, className, node, ...rest } = props;
-                const match = /language-(\w+)/.exec(className || '');
-                return match ? (
-                  <div className="bg-muted rounded p-2 overflow-auto">
-                    <code className="text-sm">{String(children)}</code>
-                  </div>
-                ) : (
-                  <code className={className} {...rest}>
-                    {children}
-                  </code>
-                );
-              },
-            }}
-          >
-            {message.content}
-          </ReactMarkdown>
+          {message.role === 'research_progress' ? (
+            <ResearchProgressUI
+              runId={message.metadata?.run_id || ''}
+              query={message.metadata?.query || message.content}
+              onComplete={(result) => {
+                console.log('Research completed:', result);
+                // Could trigger a callback to update the message or create a new one
+              }}
+              onError={(error) => {
+                console.error('Research failed:', error);
+                // Could trigger error handling
+              }}
+            />
+          ) : message.metadata?.status === 'researching' ? (
+            <motion.div
+              animate={{ opacity: [0.5, 1, 0.5] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            >
+              <ReactMarkdown
+                components={{
+                  code(props) {
+                    const { children, className, node, ...rest } = props;
+                    const match = /language-(\w+)/.exec(className || '');
+                    return match ? (
+                      <div className="bg-muted rounded p-2 overflow-auto">
+                        <code className="text-sm">{String(children)}</code>
+                      </div>
+                    ) : (
+                      <code className={className} {...rest}>
+                        {children}
+                      </code>
+                    );
+                  },
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
+            </motion.div>
+          ) : (
+            <ReactMarkdown
+              components={{
+                code(props) {
+                  const { children, className, node, ...rest } = props;
+                  const match = /language-(\w+)/.exec(className || '');
+                  return match ? (
+                    <div className="bg-muted rounded p-2 overflow-auto">
+                      <code className="text-sm">{String(children)}</code>
+                    </div>
+                  ) : (
+                    <code className={className} {...rest}>
+                      {children}
+                    </code>
+                  );
+                },
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
+          )}
         </div>
         
         {/* Add pulsing animation for researching messages */}
