@@ -18,6 +18,8 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          last_activity: string
+          status: string
           title: string
           updated_at: string
           user_id: string | null
@@ -25,6 +27,8 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          last_activity?: string
+          status?: string
           title?: string
           updated_at?: string
           user_id?: string | null
@@ -32,6 +36,8 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          last_activity?: string
+          status?: string
           title?: string
           updated_at?: string
           user_id?: string | null
@@ -95,6 +101,7 @@ export type Database = {
           created_at: string
           id: string
           metadata: Json | null
+          parallel_run_id: string | null
           result: string | null
           run_id: string
           session_id: string
@@ -106,6 +113,7 @@ export type Database = {
           created_at?: string
           id?: string
           metadata?: Json | null
+          parallel_run_id?: string | null
           result?: string | null
           run_id: string
           session_id: string
@@ -117,6 +125,7 @@ export type Database = {
           created_at?: string
           id?: string
           metadata?: Json | null
+          parallel_run_id?: string | null
           result?: string | null
           run_id?: string
           session_id?: string
