@@ -219,25 +219,27 @@ export function ChatArea({ sessionId }: ChatAreaProps) {
   return (
     <div className="flex-1 flex flex-col bg-background">
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4">
-          {messagesLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : messages.length === 0 ? (
-            <div className="text-center py-8">
-              <Bot className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-              <p className="text-muted-foreground">Start the conversation by asking a research question</p>
-            </div>
-          ) : (
-            messages.map((message) => (
-              <MessageCard key={message.id} message={message} />
-            ))
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-      </ScrollArea>
+      <div className="flex-1 overflow-hidden">
+        <ScrollArea className="h-full custom-scrollbar">
+          <div className="p-4 space-y-4">
+            {messagesLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="text-center py-8">
+                <Bot className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-muted-foreground">Start the conversation by asking a research question</p>
+              </div>
+            ) : (
+              messages.map((message) => (
+                <MessageCard key={message.id} message={message} />
+              ))
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        </ScrollArea>
+      </div>
 
       {/* Input */}
       <div className="p-4 border-t border-border">
